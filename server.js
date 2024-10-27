@@ -45,6 +45,19 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Endpoint to get all links for a specific user
+app.get('/api/users/:userId/links', async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const result = await pool.query('SELECT * FROM links WHERE user_id = $1', [userId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error getting links:', error);
+    res.status(500).json({ error: 'Error getting links' });
+  }
+});
+
+
 // Route to handle user registration with password hashing
 app.post('/api/signup', async (req, res) => {
   const { email, password, username, bio } = req.body;
