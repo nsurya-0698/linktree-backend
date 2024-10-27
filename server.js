@@ -46,19 +46,30 @@ app.get('/', (req, res) => {
   });
 
   //API route to handle user registration
-  app.post('/api/signup', async (req, res) => {
-    const { email, password } = req.body;
+// Required bcrypt module for password hashing
+const bcrypt = require('bcrypt');
+
+// API route to handle user registration with hashed password
+app.post('/api/signup', async (req, res) => {
+  const { email, password, username, bio } = req.body;
   
-    try {
-      const result = await pool.query(
-        'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *',
-        [email, password]
-      );
-      res.status(201).json(result.rows[0]);
-    } catch (error) {
-      res.status(500).json({ error: 'Error creating account' });
-    }
-  });
+  try {
+    // Hash the password before saving it in the database
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Insert the new user with the hashed password
+    const result = await pool.query(
+      'INSERT INTO users (username, email, password, bio) VALUES ($1, $2, $3, $4) RETURNING *',
+      [username, email, hashedPassword, bio]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Error creating account' });
+  }
+});
+
   
   // Create a new user
   app.post('/api/users', async (req, res) => {
@@ -104,13 +115,11 @@ app.post('/api/users/:userId/links', async (req, res) => {
 });
 
 // Route to register a new user with hashed password
-const bcrypt = require('bcrypt');
-
 app.post('/api/register', async (req, res) => {
   const { username, email, password, bio } = req.body;
 
   try {
-    // Hash the password
+    // Hash the password before storing it in the database
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // Insert the user with the hashed password
@@ -125,18 +134,19 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+
 //You need to implement a login route that:
 //Checks if the user exists by email.
 //Compares the stored hashed password with the provided password using bcrypt.
 app.post('/api/login', async (req, res) => {
   try {
-    console.log('Request body:', req.body);  // Add this
+    console.log('Request body:', req.body);  // Log request body
     const { email, password } = req.body;
 
-    console.log(`Login attempt for email: ${email}`);  // Email should appear here
+    console.log(`Login attempt for email: ${email}`);  // Log email
 
     const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    console.log('UserResult:', userResult.rows);  // Log query result
+    console.log('Database query result:', userResult.rows);  // Log result from DB
 
     if (userResult.rowCount === 0) {
       console.log('User not found');
@@ -144,9 +154,13 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = userResult.rows[0];
+    console.log('Retrieved user:', user);  // Log user details
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match:', isMatch);  // Log password comparison result
 
     if (!isMatch) {
+      console.log('Password does not match');
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
@@ -157,6 +171,7 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 // Start the server
 app.listen(port, () => {
